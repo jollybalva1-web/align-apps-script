@@ -767,3 +767,62 @@ function setupEmailTracking() {
   sheet.getRange("BR1").setValue("Sent Date");
   sheet.getRange("BQ1:BR1").setFontWeight("bold").setBackground("#4472C4").setFontColor("white");
 }
+
+/*******************************************************
+ * FRONTEND ↔ BACKEND API LAYER (Next.js Integration)
+ *******************************************************/
+
+function doGet() {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      status: "OK",
+      message: "Align Within backend is live"
+    }))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*");
+}
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("Form responses 1");
+
+    if (!sheet) {
+      throw new Error("Form responses 1 sheet not found");
+    }
+
+    const answers = payload.answers || [];
+
+    const rowData = [
+      new Date(),                     // A Timestamp
+      payload.name || "",             // B Name
+      payload.email || "",            // C Email
+      payload.context || "",          // D Context
+      payload.careerVignette || "",   // E Career
+      payload.relationshipVignette || "" // F Relationship
+    ];
+
+    answers.forEach(a => rowData.push(a)); // G → AL
+
+    sheet.appendRow(rowData);
+
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Assessment submitted successfully"
+      }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeader("Access-Control-Allow-Origin", "*");
+
+  } catch (error) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        status: "error",
+        message: error.message
+      }))
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeader("Access-Control-Allow-Origin", "*");
+  }
+}
