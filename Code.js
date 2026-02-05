@@ -767,17 +767,10 @@ function setupEmailTracking() {
   sheet.getRange("BR1").setValue("Sent Date");
   sheet.getRange("BQ1:BR1").setFontWeight("bold").setBackground("#4472C4").setFontColor("white");
 }
-
 /*******************************************************
  * FRONTEND ↔ BACKEND API LAYER (Next.js Integration)
- * Handles:
- * 1) Assessment submissions → Google Sheet
- * 2) Contact form → Email to admin
  *******************************************************/
 
-/**
- * Health check (optional)
- */
 function doGet() {
   return ContentService
     .createTextOutput(JSON.stringify({
@@ -788,22 +781,18 @@ function doGet() {
     .setHeader("Access-Control-Allow-Origin", "*");
 }
 
-/**
- * Main POST entry point
- */
 function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents);
 
-    // ROUTE REQUEST BASED ON TYPE
-    if (payload.type === "assessment") {
-      handleAssessmentSubmission(payload);
-      return jsonResponse("Assessment submitted successfully");
-    }
-
     if (payload.type === "contact") {
       handleContactForm(payload);
       return jsonResponse("Contact message sent successfully");
+    }
+
+    if (payload.type === "assessment") {
+      handleAssessmentSubmission(payload);
+      return jsonResponse("Assessment submitted successfully");
     }
 
     throw new Error("Unknown request type");
@@ -813,76 +802,59 @@ function doPost(e) {
   }
 }
 
-/**
- * ==============================
- * ASSESSMENT HANDLER
- * Saves responses to Google Sheet
- * ==============================
- */
-function handleAssessmentSubmission(payload) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("Form responses 1");
-
-  if (!sheet) {
-    throw new Error("Form responses 1 sheet not found");
+/* CONTACT FORM → EMAIL */
+function handleContactForm(data) {
+  if (!data || typeof data !== "object") {
+    throw new Error("Invalid contact payload");
   }
 
-  const answers = payload.answers || [];
-
-  const rowData = [
-    new Date(),                     // A Timestamp
-    payload.name || "",             // B Name
-    payload.email || "",            // C Email
-    payload.context || "",          // D Context
-    payload.careerVignette || "",   // E Career
-    payload.relationshipVignette || "" // F Relationship
-  ];
-
-  // Push Likert answers (G → AL)
-  answers.forEach(a => rowData.push(a));
-
-  sheet.appendRow(rowData);
-}
-
-/**
- * ==============================
- * CONTACT FORM HANDLER
- * Sends email to admin
- * ==============================
- */
-function handleContactForm(data) {
   const adminEmail = "jollybalva1@gmail.com";
 
   const subject = "New Contact Message — Align Within";
   const body =
-    "Name: " + (data.name || "") + "\n" +
-    "Email: " + (data.email || "") + "\n\n" +
-    "Message:\n" + (data.message || "");
+    `Name: ${data.name || "N/A"}
+Email: ${data.email || "N/A"}
 
-  MailApp.sendEmail(adminEmail, subject, body);
+Message:
+${data.message || "No message"}`;
+
+  GmailApp.sendEmail(adminEmail, subject, body);
 }
 
-/**
- * ==============================
- * RESPONSE HELPERS
- * ==============================
- */
+
+/* ASSESSMENT → GOOGLE SHEET */
+function handleAssessmentSubmission(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Form responses 1");
+  if (!sheet) throw new Error("Form responses 1 sheet not found");
+
+  const row = [
+    new Date(),
+    payload.name || "",
+    payload.email || "",
+    payload.context || "",
+    payload.careerVignette || "",
+    payload.relationshipVignette || "",
+    ...(payload.answers || [])
+  ];
+
+  sheet.appendRow(row);
+}
+
 function jsonResponse(msg) {
   return ContentService
-    .createTextOutput(JSON.stringify({
-      status: "success",
-      message: msg
-    }))
+    .createTextOutput(JSON.stringify({ status: "success", message: msg }))
     .setMimeType(ContentService.MimeType.JSON)
     .setHeader("Access-Control-Allow-Origin", "*");
 }
 
 function jsonError(msg) {
   return ContentService
-    .createTextOutput(JSON.stringify({
-      status: "error",
-      message: msg
-    }))
+    .createTextOutput(JSON.stringify({ status: "error", message: msg }))
     .setMimeType(ContentService.MimeType.JSON)
     .setHeader("Access-Control-Allow-Origin", "*");
 }
+
+
+
+
