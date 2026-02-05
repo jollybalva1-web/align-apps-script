@@ -770,8 +770,14 @@ function setupEmailTracking() {
 
 /*******************************************************
  * FRONTEND ↔ BACKEND API LAYER (Next.js Integration)
+ * Handles:
+ * 1) Assessment submissions → Google Sheet
+ * 2) Contact form → Email to admin
  *******************************************************/
 
+/**
+ * Health check (optional)
+ */
 function doGet() {
   return ContentService
     .createTextOutput(JSON.stringify({
@@ -782,47 +788,101 @@ function doGet() {
     .setHeader("Access-Control-Allow-Origin", "*");
 }
 
+/**
+ * Main POST entry point
+ */
 function doPost(e) {
   try {
     const payload = JSON.parse(e.postData.contents);
 
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName("Form responses 1");
-
-    if (!sheet) {
-      throw new Error("Form responses 1 sheet not found");
+    // ROUTE REQUEST BASED ON TYPE
+    if (payload.type === "assessment") {
+      handleAssessmentSubmission(payload);
+      return jsonResponse("Assessment submitted successfully");
     }
 
-    const answers = payload.answers || [];
+    if (payload.type === "contact") {
+      handleContactForm(payload);
+      return jsonResponse("Contact message sent successfully");
+    }
 
-    const rowData = [
-      new Date(),                     // A Timestamp
-      payload.name || "",             // B Name
-      payload.email || "",            // C Email
-      payload.context || "",          // D Context
-      payload.careerVignette || "",   // E Career
-      payload.relationshipVignette || "" // F Relationship
-    ];
-
-    answers.forEach(a => rowData.push(a)); // G → AL
-
-    sheet.appendRow(rowData);
-
-    return ContentService
-      .createTextOutput(JSON.stringify({
-        status: "success",
-        message: "Assessment submitted successfully"
-      }))
-      .setMimeType(ContentService.MimeType.JSON)
-      .setHeader("Access-Control-Allow-Origin", "*");
+    throw new Error("Unknown request type");
 
   } catch (error) {
-    return ContentService
-      .createTextOutput(JSON.stringify({
-        status: "error",
-        message: error.message
-      }))
-      .setMimeType(ContentService.MimeType.JSON)
-      .setHeader("Access-Control-Allow-Origin", "*");
+    return jsonError(error.message);
   }
+}
+
+/**
+ * ==============================
+ * ASSESSMENT HANDLER
+ * Saves responses to Google Sheet
+ * ==============================
+ */
+function handleAssessmentSubmission(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName("Form responses 1");
+
+  if (!sheet) {
+    throw new Error("Form responses 1 sheet not found");
+  }
+
+  const answers = payload.answers || [];
+
+  const rowData = [
+    new Date(),                     // A Timestamp
+    payload.name || "",             // B Name
+    payload.email || "",            // C Email
+    payload.context || "",          // D Context
+    payload.careerVignette || "",   // E Career
+    payload.relationshipVignette || "" // F Relationship
+  ];
+
+  // Push Likert answers (G → AL)
+  answers.forEach(a => rowData.push(a));
+
+  sheet.appendRow(rowData);
+}
+
+/**
+ * ==============================
+ * CONTACT FORM HANDLER
+ * Sends email to admin
+ * ==============================
+ */
+function handleContactForm(data) {
+  const adminEmail = "jollybalva1@gmail.com";
+
+  const subject = "New Contact Message — Align Within";
+  const body =
+    "Name: " + (data.name || "") + "\n" +
+    "Email: " + (data.email || "") + "\n\n" +
+    "Message:\n" + (data.message || "");
+
+  MailApp.sendEmail(adminEmail, subject, body);
+}
+
+/**
+ * ==============================
+ * RESPONSE HELPERS
+ * ==============================
+ */
+function jsonResponse(msg) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      status: "success",
+      message: msg
+    }))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*");
+}
+
+function jsonError(msg) {
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      status: "error",
+      message: msg
+    }))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", "*");
 }
