@@ -855,6 +855,13 @@ function jsonError(msg) {
     .setHeader("Access-Control-Allow-Origin", "*");
 }
 
+function testEmailNow() {
+  GmailApp.sendEmail(
+    "jollybalva1@gmail.com",
+    "TEST — Align Within",
+    "If you received this email, Gmail permissions and sending work correctly."
+  );
+}
 
 
 
